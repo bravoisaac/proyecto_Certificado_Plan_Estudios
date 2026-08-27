@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Agrega equivalencias de una ficha curricular PDF a un plan de estudios RTF." />
+    <title>Equivalencias · Plan de estudios</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Ir al inicio">
+          <span class="brand-mark" aria-hidden="true">E</span>
+          <span>
+            <strong>Equivalencias</strong>
+            <small>Plan de estudios</small>
+          </span>
+        </a>
+        <div class="privacy-chip">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5.5v5.8c0 5 3.4 9.5 8 10.7 4.6-1.2 8-5.7 8-10.7V5.5L12 2Zm0 2.2 6 2.6v4.5c0 3.9-2.5 7.5-6 8.6-3.5-1.1-6-4.7-6-8.6V6.8l6-2.6Zm-1 4.3v3H8.8v2H11v2.2h2v-2.2h2.2v-2H13v-3h-2Z" /></svg>
+          Procesamiento local
+        </div>
+      </header>
+
+      <main>
+        <section class="hero" aria-labelledby="page-title">
+          <div class="eyebrow"><span></span> Herramienta académica</div>
+          <h1 id="page-title">Completa tu plan de estudios con las equivalencias del PDF.</h1>
+          <p>Sube la ficha curricular y el Word base. Revisas los resultados detectados y descargas un nuevo RTF con cada equivalencia bajo su asignatura.</p>
+          <ol class="steps" aria-label="Flujo de trabajo">
+            <li class="active"><span>1</span><div><strong>Cargar</strong><small>PDF y Word</small></div></li>
+            <li><span>2</span><div><strong>Revisar</strong><small>Equivalencias</small></div></li>
+            <li><span>3</span><div><strong>Descargar</strong><small>RTF completado</small></div></li>
+          </ol>
+        </section>
+
+        <section class="workspace-card" aria-labelledby="upload-title">
+          <div class="section-heading">
+            <div>
+              <span class="section-number">01</span>
+              <div>
+                <h2 id="upload-title">Selecciona los documentos</h2>
+                <p>Los archivos se procesan en memoria y no quedan guardados.</p>
+              </div>
+            </div>
+            <span class="status-dot" id="files-status">Esperando archivos</span>
+          </div>
+
+          <div class="upload-grid">
+            <label class="dropzone" id="pdf-zone" for="pdf-input">
+              <input id="pdf-input" type="file" accept="application/pdf,.pdf" />
+              <span class="file-icon pdf" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M6 2h8l4 4v16H6V2Zm7 1.8V7h3.2L13 3.8ZM8.5 11v7h1.4v-2.2h1c1.6 0 2.6-.9 2.6-2.4 0-1.5-1-2.4-2.6-2.4H8.5Zm1.4 1.3h.9c.8 0 1.2.4 1.2 1.1 0 .7-.4 1.1-1.2 1.1h-.9v-2.2Zm4.3-1.3v7h2.1c2.1 0 3.3-1.3 3.3-3.5s-1.2-3.5-3.3-3.5h-2.1Zm1.4 1.3h.6c1.3 0 1.9.7 1.9 2.2s-.6 2.2-1.9 2.2h-.6v-4.4Z" /></svg>
+              </span>
+              <span class="dropzone-copy">
+                <strong>Ficha curricular</strong>
+                <span>Arrastra el PDF o <u>selecciónalo</u></span>
+                <small>PDF · máximo 20 MB</small>
+              </span>
+              <span class="file-ready" aria-hidden="true">✓</span>
+            </label>
+
+            <label class="dropzone" id="rtf-zone" for="rtf-input">
+              <input id="rtf-input" type="file" accept="application/rtf,text/rtf,.rtf" />
+              <span class="file-icon word" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 3h10l5 5v13H4V3Zm9 1.8V9h4.2L13 4.8ZM7 12l1.3 6h1.5l1-3.8 1 3.8h1.5l1.6-6h-1.5l-.9 4-.9-4h-1.5l-1 4-.8-4H7Z" /></svg>
+              </span>
+              <span class="dropzone-copy">
+                <strong>Plan de estudios vacío</strong>
+                <span>Arrastra el RTF o <u>selecciónalo</u></span>
+                <small>RTF de Word · máximo 25 MB</small>
+              </span>
+              <span class="file-ready" aria-hidden="true">✓</span>
+            </label>
+          </div>
+
+          <div class="privacy-note">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V8a5 5 0 0 1 10 0v2h1.5v11h-13V10H7Zm2 0h6V8a3 3 0 0 0-6 0v2Zm3 3a2 2 0 0 0-1 3.7V18h2v-1.3a2 2 0 0 0-1-3.7Z" /></svg>
+            <div><strong>Tus documentos permanecen privados</strong><span>La aplicación no usa base de datos ni conserva copias después de procesar la solicitud.</span></div>
+          </div>
+
+          <div id="global-message" class="message" role="alert" hidden></div>
+          <button class="primary-button" id="analyze-button" type="button" disabled>
+            <span>Analizar equivalencias</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7 1.4 1.4L18.8 12 10.4 3.6 9 5Z" /></svg>
+          </button>
+        </section>
+
+        <section class="results-card" id="results" aria-labelledby="results-title" hidden>
+          <div class="section-heading results-heading">
+            <div>
+              <span class="section-number">02</span>
+              <div>
+                <h2 id="results-title">Revisa las equivalencias</h2>
+                <p>Edita cualquier nombre que el PDF no haya reconocido correctamente.</p>
+              </div>
+            </div>
+            <div class="metric" aria-live="polite"><strong id="equivalence-count">0</strong><span>detectadas</span></div>
+          </div>
+
+          <div id="warning-list" class="warning-list"></div>
+          <div class="table-toolbar">
+            <label class="select-all"><input id="select-all" type="checkbox" checked /> <span>Seleccionar todas</span></label>
+            <span id="selected-count">0 seleccionadas</span>
+          </div>
+          <div class="equivalence-list" id="equivalence-list"></div>
+
+          <div class="results-actions">
+            <button class="secondary-button" id="back-button" type="button">Cambiar archivos</button>
+            <button class="primary-button compact" id="generate-button" type="button">
+              <span>Generar Word completado</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3h2v10l3.5-3.5 1.4 1.4L12 16.8l-5.9-5.9 1.4-1.4L11 13V3ZM5 19h14v2H5v-2Z" /></svg>
+            </button>
+          </div>
+        </section>
+
+        <section class="how-it-works" aria-labelledby="how-title">
+          <div class="eyebrow"><span></span> Proceso transparente</div>
+          <h2 id="how-title">¿Qué hace la herramienta?</h2>
+          <div class="feature-grid">
+            <article><span>01</span><h3>Lee la tabla curricular</h3><p>Reconoce códigos, oportunidades, notas y estados directamente desde el PDF.</p></article>
+            <article><span>02</span><h3>Filtra la información</h3><p>Descarta periodo, nota y estado. Solo conserva el código y nombre del equivalente aprobado.</p></article>
+            <article><span>03</span><h3>Conserva el formato</h3><p>Inserta “EQUIVALENTE:” en la ficha de la asignatura sin reconstruir el documento original.</p></article>
+          </div>
+        </section>
+      </main>
+
+      <footer><span>Herramienta de apoyo académico</span><span>Compatible con fichas curriculares tabulares y planes RTF</span></footer>
+    </div>
+    <script src="/app.js" defer></script>
+  </body>
+</html>
+
