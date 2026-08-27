@@ -218,9 +218,11 @@ class AppHandler(BaseHTTPRequestHandler):
 
 
 def main() -> None:
+    host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8000"))
-    server = ThreadingHTTPServer(("127.0.0.1", port), AppHandler)
-    print(f"Aplicación disponible en http://127.0.0.1:{port}")
+    server = ThreadingHTTPServer((host, port), AppHandler)
+    display_host = "127.0.0.1" if host == "0.0.0.0" else host
+    print(f"Aplicación disponible en http://{display_host}:{port}")
     print("Presione Ctrl+C para detenerla.")
     try:
         server.serve_forever()
@@ -232,4 +234,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

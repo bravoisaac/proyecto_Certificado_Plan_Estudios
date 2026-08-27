@@ -66,6 +66,16 @@ El navegador descargará una copia con el sufijo `_con_equivalencias.rtf`; el ar
 - Algunos PDF no incluyen información Unicode completa para las letras acentuadas. La app repara vocabulario académico frecuente y marca los casos restantes para revisión manual.
 - El editor busca las fichas de asignatura con la geometría del RTF de ejemplo (`posx1587` para el título y `posx732` para el código). Otros diseños de RTF pueden necesitar un adaptador.
 
+## Despliegue en Render
+
+El repositorio incluye `render.yaml` para publicarlo como un servicio web Python:
+
+1. En Render, cree un **Blueprint** desde este repositorio de GitHub.
+2. Render instalará `requirements.txt` y ejecutará `python server.py`.
+3. La variable `HOST=0.0.0.0` y el puerto proporcionado por Render se configuran automáticamente.
+
+El servicio no necesita base de datos ni disco persistente: los documentos se procesan únicamente en memoria.
+
 ## Pruebas
 
 ```powershell
