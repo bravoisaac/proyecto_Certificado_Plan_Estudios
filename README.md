@@ -58,6 +58,10 @@ También puede iniciarla manualmente:
 
 El navegador descargará una copia con el sufijo `_con_equivalencias.rtf`; el archivo original no se modifica.
 
+Las equivalencias cuya asignatura no tenga una ficha editable en el RTF se
+incluyen al final del Word, agrupadas bajo el título **Equivalencias sin ficha
+editable**, para que ninguna selección se pierda.
+
 ## Privacidad y límites
 
 - El servidor escucha solo en `127.0.0.1`.

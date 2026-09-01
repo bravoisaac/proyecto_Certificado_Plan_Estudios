@@ -74,6 +74,7 @@ class Equivalence:
     grade: str
     page: int
     has_unrecognized_characters: bool = False
+    has_equivalence: bool = True
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -208,6 +209,37 @@ def _iter_subject_rows(table: list[list[str | None]]) -> Iterable[list[str | Non
             yield row
 
 
+def _include_all_subjects(
+    subjects: dict[str, tuple[str, int]],
+    equivalences: Iterable[Equivalence],
+) -> tuple[Equivalence, ...]:
+    by_subject: dict[str, list[Equivalence]] = {}
+    for item in equivalences:
+        by_subject.setdefault(item.subject_code, []).append(item)
+
+    items: list[Equivalence] = []
+    for subject_code, (subject_name, page) in subjects.items():
+        approved = by_subject.get(subject_code)
+        if approved:
+            items.extend(approved)
+            continue
+        normalized_name = _normalize_subject_name(subject_name)
+        items.append(
+            Equivalence(
+                subject_code=subject_code,
+                subject_name=normalized_name,
+                equivalent_code="",
+                equivalent_name="",
+                period="",
+                grade="",
+                page=page,
+                has_unrecognized_characters="�" in normalized_name,
+                has_equivalence=False,
+            )
+        )
+    return tuple(items)
+
+
 def extract_equivalences(source: bytes | BinaryIO) -> ExtractionResult:
     if isinstance(source, bytes):
         stream: BinaryIO = io.BytesIO(source)
@@ -215,6 +247,7 @@ def extract_equivalences(source: bytes | BinaryIO) -> ExtractionResult:
         stream = source
 
     equivalences: list[Equivalence] = []
+    subjects: dict[str, tuple[str, int]] = {}
     subjects_read = 0
     warnings: list[str] = []
 
@@ -231,6 +264,7 @@ def extract_equivalences(source: bytes | BinaryIO) -> ExtractionResult:
                         subject_code = str(row[0] or "").strip().upper()
                         subject_name = str(row[1] or "").strip()
                         subjects_read += 1
+                        subjects.setdefault(subject_code, (subject_name, page_number))
                         for cell in row[3:]:
                             if not cell:
                                 continue
@@ -261,7 +295,7 @@ def extract_equivalences(source: bytes | BinaryIO) -> ExtractionResult:
         unique[(item.subject_code, item.equivalent_code, item.period)] = item
 
     return ExtractionResult(
-        equivalences=tuple(unique.values()),
+        equivalences=_include_all_subjects(subjects, unique.values()),
         subjects_read=subjects_read,
         pages_read=pages_read,
         warnings=tuple(warnings),

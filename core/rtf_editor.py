@@ -12,6 +12,7 @@ COURSE_CODE_RE = re.compile(r"^[A-Z0-9-]{3,20}$")
 class RtfEditResult:
     content: bytes
     inserted_courses: tuple[str, ...]
+    appended_courses: tuple[str, ...]
     missing_courses: tuple[str, ...]
     already_filled_courses: tuple[str, ...]
 
@@ -43,6 +44,7 @@ def _rtf_escape(value: str) -> str:
 
 def _find_detail_anchor(rtf: str, course_code: str) -> tuple[int, int] | None:
     token = re.compile(rf"(?<![A-Z0-9]){re.escape(course_code)}(?![A-Z0-9])")
+    compatible_anchor: tuple[int, int] | None = None
     for match in token.finditer(rtf):
         paragraph_start = rtf.rfind("\\pard", max(0, match.start() - 1800), match.start())
         if paragraph_start < 0:
@@ -50,7 +52,24 @@ def _find_detail_anchor(rtf: str, course_code: str) -> tuple[int, int] | None:
         controls = rtf[paragraph_start:match.start()]
         if "\\posx732" in controls and "\\absh-192" in controls:
             return paragraph_start, match.start()
-    return None
+
+        paragraph_end = rtf.find("\\par }", match.end(), match.end() + 1800)
+        heading_start = rtf.rfind(
+            "\\pard", max(0, paragraph_start - 5000), paragraph_start
+        )
+        if paragraph_end < 0 or heading_start < 0:
+            continue
+        heading_end = rtf.find("\\par }", heading_start, paragraph_start)
+        heading_controls = rtf[heading_start:paragraph_start]
+        if (
+            heading_end >= 0
+            and re.search(r"\\posx-?\d+", controls)
+            and re.search(r"\\absh-?\d+", controls)
+            and re.search(r"\\posx-?\d+", heading_controls)
+            and re.search(r"\\absh-?\d+", heading_controls)
+        ):
+            compatible_anchor = (paragraph_start, match.start())
+    return compatible_anchor
 
 
 def course_exists_in_detail(rtf_content: bytes, course_code: str) -> bool:
@@ -75,7 +94,7 @@ def _insert_course_equivalences(
         return rtf, "missing"
 
     heading_controls = rtf[heading_start:code_paragraph_start]
-    if "\\posx1587" not in heading_controls:
+    if not re.search(r"\\posx-?\d+", heading_controls):
         return rtf, "missing"
 
     if "EQUIVALENTE:" in heading_controls.upper():
@@ -108,6 +127,49 @@ def _insert_course_equivalences(
     return updated, "inserted"
 
 
+def _append_unmatched_equivalences(
+    rtf: str,
+    courses: Iterable[tuple[str, str, list[tuple[str, str]]]],
+) -> tuple[str, list[str], list[str]]:
+    document_end = rtf.rfind("}")
+    if document_end < 0:
+        raise RtfEditError("El archivo RTF no tiene un cierre válido.")
+
+    blocks: list[str] = []
+    appended: list[str] = []
+    already_filled: list[str] = []
+    upper_rtf = rtf.upper()
+    for subject_code, subject_name, values in courses:
+        marker = f"ASIGNATURA SIN FICHA: {subject_code}"
+        if marker in upper_rtf:
+            already_filled.append(subject_code)
+            continue
+        lines = [
+            _rtf_escape(f"EQUIVALENTE: {code} {name}".strip())
+            for code, name in values
+        ]
+        heading = f"ASIGNATURA SIN FICHA: {subject_code} {subject_name}".strip()
+        blocks.append(
+            "{\\pard\\plain\\sa120\\fs18\\b "
+            + _rtf_escape(heading)
+            + "\\b0\\line "
+            + "\\line ".join(lines)
+            + "\\par}\n"
+        )
+        appended.append(subject_code)
+
+    if not blocks:
+        return rtf, appended, already_filled
+    title = ""
+    if "EQUIVALENCIAS SIN FICHA EDITABLE" not in upper_rtf:
+        title = (
+            "\n\\page\n{\\pard\\plain\\sa240\\b\\fs20 "
+            "EQUIVALENCIAS SIN FICHA EDITABLE\\par}\n"
+        )
+    updated = rtf[:document_end] + title + "".join(blocks) + rtf[document_end:]
+    return updated, appended, already_filled
+
+
 def apply_equivalences(
     rtf_content: bytes,
     equivalences: Iterable[Mapping[str, str]],
@@ -116,8 +178,10 @@ def apply_equivalences(
         raise RtfEditError("El archivo Word debe estar en formato RTF válido.")
 
     grouped: dict[str, list[tuple[str, str]]] = {}
+    subject_names: dict[str, str] = {}
     for item in equivalences:
         subject_code = str(item.get("subject_code", "")).strip().upper()
+        subject_name = " ".join(str(item.get("subject_name", "")).split())
         equivalent_code = str(item.get("equivalent_code", "")).strip().upper()
         equivalent_name = " ".join(str(item.get("equivalent_name", "")).split())
         if not COURSE_CODE_RE.fullmatch(subject_code):
@@ -127,11 +191,14 @@ def apply_equivalences(
         if not equivalent_name or len(equivalent_name) > 300:
             raise RtfEditError("El nombre equivalente debe tener entre 1 y 300 caracteres.")
         grouped.setdefault(subject_code, []).append((equivalent_code, equivalent_name))
+        subject_names.setdefault(subject_code, subject_name)
 
     rtf = rtf_content.decode("latin-1")
     inserted: list[str] = []
+    appended: list[str] = []
     missing: list[str] = []
     already_filled: list[str] = []
+    unmatched: list[tuple[str, str, list[tuple[str, str]]]] = []
 
     for course_code, values in grouped.items():
         rtf, status = _insert_course_equivalences(rtf, course_code, values)
@@ -140,11 +207,21 @@ def apply_equivalences(
         elif status == "already_filled":
             already_filled.append(course_code)
         else:
-            missing.append(course_code)
+            unmatched.append((course_code, subject_names[course_code], values))
+
+    if unmatched:
+        try:
+            rtf, appended, fallback_already_filled = _append_unmatched_equivalences(
+                rtf, unmatched
+            )
+            already_filled.extend(fallback_already_filled)
+        except RtfEditError:
+            missing.extend(course_code for course_code, _, _ in unmatched)
 
     return RtfEditResult(
         content=rtf.encode("latin-1"),
         inserted_courses=tuple(inserted),
+        appended_courses=tuple(appended),
         missing_courses=tuple(missing),
         already_filled_courses=tuple(already_filled),
     )

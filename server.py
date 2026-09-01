@@ -192,7 +192,7 @@ class AppHandler(BaseHTTPRequestHandler):
             raise RequestError("La solicitud contiene demasiadas equivalencias.")
 
         result = apply_equivalences(rtf_content, equivalences)
-        if not result.inserted_courses:
+        if not result.inserted_courses and not result.appended_courses:
             if result.already_filled_courses:
                 raise RequestError("Las asignaturas seleccionadas ya contienen equivalencias.")
             raise RequestError("Ninguna asignatura seleccionada se encontró en el RTF.")
@@ -200,7 +200,9 @@ class AppHandler(BaseHTTPRequestHandler):
         output_name = _safe_output_name(rtf_filename)
         metadata = json.dumps(
             {
+                "requested": len(equivalences),
                 "inserted": result.inserted_courses,
+                "appended": result.appended_courses,
                 "missing": result.missing_courses,
                 "already_filled": result.already_filled_courses,
             },

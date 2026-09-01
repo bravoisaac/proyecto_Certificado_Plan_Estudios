@@ -99,7 +99,11 @@ function escapeHtml(value) {
 }
 
 function renderEquivalences(payload) {
-  state.equivalences = payload.equivalences.map((item, index) => ({ ...item, selected: item.found_in_rtf, id: index }));
+  state.equivalences = payload.equivalences.map((item, index) => ({
+    ...item,
+    selected: Boolean(item.equivalent_code && item.equivalent_name.trim()),
+    id: index,
+  }));
   $("#equivalence-count").textContent = state.equivalences.length;
   const warnings = [...payload.warnings];
   if (!state.equivalences.length) warnings.push("No se encontraron equivalencias aprobadas en el PDF.");
@@ -107,7 +111,7 @@ function renderEquivalences(payload) {
 
   list.innerHTML = state.equivalences.map((item) => `
     <div class="equivalence-row ${item.found_in_rtf ? "" : "unmatched"}" data-id="${item.id}">
-      <input class="row-select" type="checkbox" aria-label="Incluir equivalencia de ${escapeHtml(item.subject_code)}" ${item.selected ? "checked" : ""} ${item.found_in_rtf ? "" : "disabled"} />
+      <input class="row-select" type="checkbox" aria-label="Incluir equivalencia de ${escapeHtml(item.subject_code)}" ${item.selected ? "checked" : ""} />
       <div class="subject">
         <span class="subject-code">${escapeHtml(item.subject_code)}</span>
         <span>${escapeHtml(item.subject_name)}</span>
@@ -121,24 +125,33 @@ function renderEquivalences(payload) {
           <label for="name-${item.id}">Nombre equivalente</label>
           <input id="name-${item.id}" class="equivalent-name" maxlength="300" value="${escapeHtml(item.equivalent_name)}" />
         </div>
-        ${item.found_in_rtf ? "" : '<div class="match-note">Esta asignatura no aparece como ficha editable en el RTF.</div>'}
+        ${item.has_equivalence ? "" : '<div class="manual-note">Sin equivalencia aprobada detectada. Puedes completar estos campos manualmente.</div>'}
+        ${item.found_in_rtf ? "" : '<div class="fallback-note">Esta asignatura se agregará al final del Word porque no tiene una ficha editable en el RTF.</div>'}
       </div>
     </div>
   `).join("");
 
   list.querySelectorAll(".equivalence-row").forEach((row) => {
     const item = state.equivalences[Number(row.dataset.id)];
-    row.querySelector(".row-select").addEventListener("change", (event) => {
+    const rowSelect = row.querySelector(".row-select");
+    const syncCompletedSelection = () => {
+      item.selected = Boolean(item.equivalent_code && item.equivalent_name.trim());
+      rowSelect.checked = item.selected;
+      updateSelection();
+    };
+    rowSelect.addEventListener("change", (event) => {
       item.selected = event.target.checked;
       updateSelection();
     });
     row.querySelector(".equivalent-code").addEventListener("input", (event) => {
       item.equivalent_code = event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "");
       event.target.value = item.equivalent_code;
+      syncCompletedSelection();
     });
     row.querySelector(".equivalent-name").addEventListener("input", (event) => {
       item.equivalent_name = event.target.value;
       row.querySelector(".equivalent-fields").classList.toggle("unknown", event.target.value.includes("�"));
+      syncCompletedSelection();
     });
   });
 
@@ -150,7 +163,7 @@ function renderEquivalences(payload) {
 }
 
 function updateSelection() {
-  const available = state.equivalences.filter((item) => item.found_in_rtf);
+  const available = state.equivalences;
   const selected = available.filter((item) => item.selected);
   $("#selected-count").textContent = `${selected.length} seleccionada${selected.length === 1 ? "" : "s"}`;
   generateButton.disabled = selected.length === 0;
@@ -179,9 +192,12 @@ analyzeButton.addEventListener("click", async () => {
 
 selectAll.addEventListener("change", () => {
   state.equivalences.forEach((item) => {
-    if (item.found_in_rtf) item.selected = selectAll.checked;
+    item.selected = selectAll.checked && Boolean(item.equivalent_code && item.equivalent_name.trim());
   });
-  list.querySelectorAll(".row-select:not(:disabled)").forEach((checkbox) => { checkbox.checked = selectAll.checked; });
+  list.querySelectorAll(".equivalence-row").forEach((row) => {
+    const item = state.equivalences[Number(row.dataset.id)];
+    row.querySelector(".row-select").checked = item.selected;
+  });
   updateSelection();
 });
 
@@ -193,8 +209,13 @@ $("#back-button").addEventListener("click", () => {
 generateButton.addEventListener("click", async () => {
   clearMessage();
   const selected = state.equivalences
-    .filter((item) => item.selected && item.found_in_rtf)
-    .map(({ subject_code, equivalent_code, equivalent_name }) => ({ subject_code, equivalent_code, equivalent_name: equivalent_name.trim() }));
+    .filter((item) => item.selected)
+    .map(({ subject_code, subject_name, equivalent_code, equivalent_name }) => ({
+      subject_code,
+      subject_name,
+      equivalent_code,
+      equivalent_name: equivalent_name.trim(),
+    }));
   if (selected.some((item) => !item.equivalent_code || !item.equivalent_name)) {
     showMessage("Completa el código y el nombre de todas las equivalencias seleccionadas.");
     return;
@@ -210,6 +231,13 @@ generateButton.addEventListener("click", async () => {
       throw new Error(payload.error || "No fue posible generar el archivo.");
     }
     const blob = await response.blob();
+    const resultHeader = response.headers.get("X-Equivalence-Result") || "";
+    let generationResult = null;
+    try {
+      generationResult = resultHeader ? JSON.parse(resultHeader) : null;
+    } catch {
+      generationResult = null;
+    }
     const disposition = response.headers.get("Content-Disposition") || "";
     const match = disposition.match(/filename="([^"]+)"/);
     const filename = match?.[1] || "plan_con_equivalencias.rtf";
@@ -221,7 +249,19 @@ generateButton.addEventListener("click", async () => {
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    showMessage(`Archivo ${filename} generado correctamente.`, "success");
+    const resultItems = generationResult
+      ? [generationResult.inserted, generationResult.appended, generationResult.already_filled]
+      : [];
+    const processed = generationResult
+      ? resultItems.reduce((total, items) => total + (Array.isArray(items) ? items.length : 0), 0)
+      : null;
+    const requested = Number.isInteger(generationResult?.requested)
+      ? generationResult.requested
+      : selected.length;
+    const summary = processed === null
+      ? ""
+      : ` ${processed} de ${requested} asignaturas quedaron incluidas.`;
+    showMessage(`Archivo ${filename} generado correctamente.${summary}`, "success");
   } catch (error) {
     showMessage(error.message);
   } finally {
