@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from typing import Iterable, Mapping
 
 
 COURSE_CODE_RE = re.compile(r"^[A-Z0-9-]{3,20}$")
+NAME_STOP_WORDS = {"DE", "DEL", "EL", "EN", "LA", "LAS", "LOS", "Y"}
 
 
 @dataclass(frozen=True)
@@ -40,6 +43,136 @@ def _rtf_escape(value: str) -> str:
                 codepoint -= 65536
             output.append(f"\\u{codepoint}?")
     return "".join(output)
+
+
+def _rtf_visible_text(value: str) -> str:
+    # Los saltos físicos del archivo RTF no representan espacios visibles.
+    value = value.replace("\r", "").replace("\n", "")
+    value = re.sub(
+        r"\\u(-?\d+)\??",
+        lambda match: chr(int(match.group(1)) % 65536),
+        value,
+    )
+    value = re.sub(
+        r"\\'([0-9A-Fa-f]{2})",
+        lambda match: bytes([int(match.group(1), 16)]).decode("cp1252"),
+        value,
+    )
+    value = value.replace(r"\~", " ").replace(r"\_", "-")
+    value = re.sub(r"\\[A-Za-z]+-?\d* ?", "", value)
+    value = value.replace(r"\{", "{").replace(r"\}", "}").replace(r"\\", "\\")
+    value = re.sub(r"[{}]", "", value)
+    return " ".join(value.split())
+
+
+def _name_tokens(value: str) -> tuple[str, ...]:
+    value = value.replace("�", "")
+    value = "".join(
+        character
+        for character in unicodedata.normalize("NFKD", value.upper())
+        if not unicodedata.combining(character)
+    )
+    return tuple(
+        token
+        for token in re.findall(r"[A-Z0-9]+", value)
+        if token not in NAME_STOP_WORDS
+    )
+
+
+def _name_match_score(source_name: str, target_name: str) -> float | None:
+    source_tokens = _name_tokens(source_name)
+    target_tokens = _name_tokens(target_name)
+    if not source_tokens or not target_tokens:
+        return None
+    if source_tokens == target_tokens:
+        return 1.0
+
+    shorter, longer = (
+        (source_tokens, target_tokens)
+        if len(source_tokens) <= len(target_tokens)
+        else (target_tokens, source_tokens)
+    )
+    if len(shorter) == 1 and len(shorter[0]) < 6:
+        return None
+
+    unused = set(range(len(longer)))
+    similarities: list[float] = []
+    for token in shorter:
+        candidates = [
+            (SequenceMatcher(None, token, longer[index]).ratio(), index)
+            for index in unused
+        ]
+        if not candidates:
+            return None
+        similarity, index = max(candidates)
+        minimum = 1.0 if len(token) <= 3 else 0.82
+        if similarity < minimum:
+            return None
+        similarities.append(similarity)
+        unused.remove(index)
+
+    score = sum(similarities) / len(similarities)
+    score -= 0.03 * (len(longer) - len(shorter))
+    return score if score >= 0.84 else None
+
+
+def _control_number(fragment: str, name: str) -> int | None:
+    match = re.search(rf"\\{name}(-?\d+)", fragment)
+    return int(match.group(1)) if match else None
+
+
+def _has_detail_card_geometry(code_controls: str, heading_controls: str) -> bool:
+    code_x = _control_number(code_controls, "posx")
+    code_y = _control_number(code_controls, "posy")
+    code_width = _control_number(code_controls, "absw")
+    heading_x = _control_number(heading_controls, "posx")
+    heading_y = _control_number(heading_controls, "posy")
+    heading_width = _control_number(heading_controls, "absw")
+    return (
+        None not in (code_x, code_y, code_width, heading_x, heading_y, heading_width)
+        and code_y == heading_y
+        and code_x < heading_x
+        and code_width < heading_width
+    )
+
+
+def _find_detail_anchor_by_name(rtf: str, subject_name: str) -> tuple[int, int] | None:
+    candidates: list[tuple[float, tuple[int, int]]] = []
+    paragraph_starts = [match.start() for match in re.finditer(r"\\pard\b", rtf)]
+    for index, paragraph_start in enumerate(paragraph_starts):
+        paragraph_end = (
+            paragraph_starts[index + 1]
+            if index + 1 < len(paragraph_starts)
+            else len(rtf)
+        )
+        code_controls = rtf[paragraph_start:paragraph_end]
+        target_code = _rtf_visible_text(code_controls)
+        if (
+            not COURSE_CODE_RE.fullmatch(target_code)
+            or not re.search(r"[A-Z]", target_code)
+            or not re.search(r"\d", target_code)
+        ):
+            continue
+
+        heading_start = rtf.rfind(
+            "\\pard", max(0, paragraph_start - 5000), paragraph_start
+        )
+        if heading_start < 0:
+            continue
+        heading_controls = rtf[heading_start:paragraph_start]
+        if not _has_detail_card_geometry(code_controls, heading_controls):
+            continue
+
+        score = _name_match_score(subject_name, _rtf_visible_text(heading_controls))
+        if score is not None:
+            candidates.append((score, (paragraph_start, paragraph_start)))
+
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    if len(candidates) > 1 and candidates[0][0] - candidates[1][0] < 0.08:
+        return None
+    return candidates[0][1]
 
 
 def _find_detail_anchor(rtf: str, course_code: str) -> tuple[int, int] | None:
