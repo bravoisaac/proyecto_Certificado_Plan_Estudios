@@ -22,6 +22,7 @@ MAX_BODY_BYTES = 50 * 1024 * 1024
 MAX_PDF_BYTES = 20 * 1024 * 1024
 MAX_RTF_BYTES = 25 * 1024 * 1024
 SAFE_STEM_RE = re.compile(r"[^A-Za-z0-9_-]+")
+ALLOWED_CORS_ORIGINS = {"https://bravoisaac.github.io"}
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 LOGGER = logging.getLogger("equivalencias")
@@ -45,17 +46,34 @@ class AppHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None:
         LOGGER.info("%s - %s", self.address_string(), format % args)
 
+    def _send_cors_headers(self) -> None:
+        origin = self.headers.get("Origin", "")
+        if origin not in ALLOWED_CORS_ORIGINS:
+            return
+        self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header(
+            "Access-Control-Expose-Headers",
+            "Content-Disposition, X-Equivalence-Result",
+        )
+        self.send_header("Vary", "Origin")
+
     def _send_json(self, payload: object, status: int = HTTPStatus.OK) -> None:
         content = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(content)))
         self.send_header("Cache-Control", "no-store")
+        self._send_cors_headers()
         self.end_headers()
         self.wfile.write(content)
 
     def _send_file(self, path: Path) -> None:
-        if not path.is_file() or path.parent != STATIC_DIR:
+        allowed_files = {
+            BASE_DIR / "index.html",
+            STATIC_DIR / "app.js",
+            STATIC_DIR / "styles.css",
+        }
+        if not path.is_file() or path not in allowed_files:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         content = path.read_bytes()
@@ -117,15 +135,17 @@ class AppHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 - API de BaseHTTPRequestHandler
         path = urlparse(self.path).path
         routes = {
-            "/": "index.html",
-            "/app.js": "app.js",
-            "/styles.css": "styles.css",
+            "/": BASE_DIR / "index.html",
+            "/app.js": STATIC_DIR / "app.js",
+            "/styles.css": STATIC_DIR / "styles.css",
+            "/static/app.js": STATIC_DIR / "app.js",
+            "/static/styles.css": STATIC_DIR / "styles.css",
         }
-        filename = routes.get(path)
-        if not filename:
+        file_path = routes.get(path)
+        if not file_path:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
-        self._send_file(STATIC_DIR / filename)
+        self._send_file(file_path)
 
     def do_POST(self) -> None:  # noqa: N802 - API de BaseHTTPRequestHandler
         try:
@@ -146,6 +166,22 @@ class AppHandler(BaseHTTPRequestHandler):
                 {"error": "No se pudo completar el proceso. Revise los archivos e inténtelo nuevamente."},
                 HTTPStatus.INTERNAL_SERVER_ERROR,
             )
+
+    def do_OPTIONS(self) -> None:  # noqa: N802 - API de BaseHTTPRequestHandler
+        path = urlparse(self.path).path
+        origin = self.headers.get("Origin", "")
+        if (
+            path not in {"/api/analyze", "/api/generate"}
+            or origin not in ALLOWED_CORS_ORIGINS
+        ):
+            self.send_error(HTTPStatus.FORBIDDEN)
+            return
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self._send_cors_headers()
+        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Max-Age", "86400")
+        self.end_headers()
 
     def _analyze(self) -> None:
         fields = self._read_form()
@@ -217,6 +253,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(result.content)))
         self.send_header("X-Equivalence-Result", metadata)
         self.send_header("Cache-Control", "no-store")
+        self._send_cors_headers()
         self.end_headers()
         self.wfile.write(result.content)
 

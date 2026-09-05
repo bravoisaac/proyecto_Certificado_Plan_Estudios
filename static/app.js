@@ -19,6 +19,12 @@ const limits = {
   rtf: 25 * 1024 * 1024,
 };
 
+const API_BASE_URL = window.location.hostname.endsWith("github.io")
+  ? "https://equivalencias-plan-estudios.onrender.com"
+  : "";
+
+const apiUrl = (path) => `${API_BASE_URL}${path}`;
+
 function formatBytes(bytes) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -178,7 +184,7 @@ analyzeButton.addEventListener("click", async () => {
   form.append("rtf", state.rtf);
   setBusy(analyzeButton, true, "Analizando documentos");
   try {
-    const response = await fetch("/api/analyze", { method: "POST", body: form });
+    const response = await fetch(apiUrl("/api/analyze"), { method: "POST", body: form });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "No fue posible analizar los archivos.");
     renderEquivalences(payload);
@@ -225,7 +231,7 @@ generateButton.addEventListener("click", async () => {
   form.append("equivalences", new Blob([JSON.stringify(selected)], { type: "application/json" }), "equivalences.json");
   setBusy(generateButton, true, "Generando Word");
   try {
-    const response = await fetch("/api/generate", { method: "POST", body: form });
+    const response = await fetch(apiUrl("/api/generate"), { method: "POST", body: form });
     if (!response.ok) {
       const payload = await response.json();
       throw new Error(payload.error || "No fue posible generar el archivo.");

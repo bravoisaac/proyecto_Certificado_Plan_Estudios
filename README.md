@@ -2,6 +2,8 @@
 
 Aplicación web local que lee una ficha curricular en PDF, identifica las equivalencias aprobadas y las agrega bajo la asignatura correspondiente en un plan de estudios de Word en formato RTF.
 
+Aplicación publicada: [GitHub Pages](https://bravoisaac.github.io/proyecto_Certificado_Plan_Estudios/).
+
 ## Regla implementada
 
 Para una celda como:
@@ -79,6 +81,10 @@ El repositorio incluye `render.yaml` para publicarlo como un servicio web Python
 3. La variable `HOST=0.0.0.0` y el puerto proporcionado por Render se configuran automáticamente.
 
 El servicio no necesita base de datos ni disco persistente: los documentos se procesan únicamente en memoria.
+
+## Despliegue en GitHub Pages
+
+GitHub Pages publica el `index.html` de la raíz desde `main`, junto con los recursos de `static/`. En Pages, el navegador envía las solicitudes de procesamiento al backend de Render en `https://equivalencias-plan-estudios.onrender.com`; al ejecutar la aplicación localmente, mantiene las rutas `/api` del servidor local.
 
 ## Pruebas
 
