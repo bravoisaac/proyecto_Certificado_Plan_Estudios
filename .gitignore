@@ -1,6 +1,11 @@
 __pycache__/
 *.py[cod]
 .venv/
-output/
+output/*
+!output/playwright/
+output/playwright/*
+!output/playwright/readme/
+output/playwright/readme/*
+!output/playwright/readme/app-inicio.png
+!output/playwright/readme/app-equivalencias.png
 tmp/
-
