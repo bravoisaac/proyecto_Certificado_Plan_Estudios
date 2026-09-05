@@ -17,6 +17,13 @@ ALTERNATE_CARD_RTF = rb"""{\rtf1\ansi
 \par }\pard \posx60 OTRO CONTENIDO\par
 }"""
 
+MISMATCHED_CODE_CARD_RTF = rb"""{\rtf1\ansi
+\pard \posx1700\posy2100\absh-520\absw5900 {\b BASES QU\'cdMICAS DE LA VIDA
+\par }{\b
+\par }\pard \posx850\posy2100\absh-210\absw900 {\b KIC124
+\par }\pard \posx60 OTRO CONTENIDO\par
+}"""
+
 RTF_WITHOUT_EDITABLE_CARD = rb"""{\rtf1\ansi
 \pard PLAN DE ESTUDIOS\par
 }"""
@@ -36,6 +43,30 @@ class RtfEditorTests(unittest.TestCase):
 
     def test_finds_compatible_card_with_different_geometry(self):
         self.assertTrue(course_exists_in_detail(ALTERNATE_CARD_RTF, "NUC114"))
+
+    def test_finds_card_by_subject_name_when_code_changed(self):
+        self.assertTrue(
+            course_exists_in_detail(
+                MISMATCHED_CODE_CARD_RTF,
+                "NUC114",
+                "BASES QU�MICAS",
+            )
+        )
+
+    def test_inserts_by_subject_name_when_code_changed(self):
+        result = apply_equivalences(
+            MISMATCHED_CODE_CARD_RTF,
+            [{
+                "subject_code": "NUC114",
+                "subject_name": "BASES QU�MICAS",
+                "equivalent_code": "PCSAL124",
+                "equivalent_name": "BASES QUÍMICAS",
+            }],
+        )
+        text = result.content.decode("latin-1")
+        self.assertIn("EQUIVALENTE: PCSAL124 BASES QU\\u205?MICAS", text)
+        self.assertEqual(result.inserted_courses, ("NUC114",))
+        self.assertEqual(result.appended_courses, ())
 
     def test_inserts_into_compatible_card_with_different_geometry(self):
         result = apply_equivalences(

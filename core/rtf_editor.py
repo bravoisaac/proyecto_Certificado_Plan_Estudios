@@ -175,7 +175,11 @@ def _find_detail_anchor_by_name(rtf: str, subject_name: str) -> tuple[int, int] 
     return candidates[0][1]
 
 
-def _find_detail_anchor(rtf: str, course_code: str) -> tuple[int, int] | None:
+def _find_detail_anchor(
+    rtf: str,
+    course_code: str,
+    subject_name: str = "",
+) -> tuple[int, int] | None:
     token = re.compile(rf"(?<![A-Z0-9]){re.escape(course_code)}(?![A-Z0-9])")
     compatible_anchor: tuple[int, int] | None = None
     for match in token.finditer(rtf):
@@ -194,30 +198,35 @@ def _find_detail_anchor(rtf: str, course_code: str) -> tuple[int, int] | None:
             continue
         heading_end = rtf.find("\\par }", heading_start, paragraph_start)
         heading_controls = rtf[heading_start:paragraph_start]
-        if (
-            heading_end >= 0
-            and re.search(r"\\posx-?\d+", controls)
-            and re.search(r"\\absh-?\d+", controls)
-            and re.search(r"\\posx-?\d+", heading_controls)
-            and re.search(r"\\absh-?\d+", heading_controls)
+        if heading_end >= 0 and _has_detail_card_geometry(
+            controls, heading_controls
         ):
             compatible_anchor = (paragraph_start, match.start())
-    return compatible_anchor
+    if compatible_anchor:
+        return compatible_anchor
+    if subject_name:
+        return _find_detail_anchor_by_name(rtf, subject_name)
+    return None
 
 
-def course_exists_in_detail(rtf_content: bytes, course_code: str) -> bool:
+def course_exists_in_detail(
+    rtf_content: bytes,
+    course_code: str,
+    subject_name: str = "",
+) -> bool:
     if not is_rtf(rtf_content):
         return False
     text = rtf_content.decode("latin-1")
-    return _find_detail_anchor(text, course_code.upper()) is not None
+    return _find_detail_anchor(text, course_code.upper(), subject_name) is not None
 
 
 def _insert_course_equivalences(
     rtf: str,
     course_code: str,
+    subject_name: str,
     values: list[tuple[str, str]],
 ) -> tuple[str, str]:
-    anchor = _find_detail_anchor(rtf, course_code)
+    anchor = _find_detail_anchor(rtf, course_code, subject_name)
     if not anchor:
         return rtf, "missing"
 
@@ -334,7 +343,9 @@ def apply_equivalences(
     unmatched: list[tuple[str, str, list[tuple[str, str]]]] = []
 
     for course_code, values in grouped.items():
-        rtf, status = _insert_course_equivalences(rtf, course_code, values)
+        rtf, status = _insert_course_equivalences(
+            rtf, course_code, subject_names[course_code], values
+        )
         if status == "inserted":
             inserted.append(course_code)
         elif status == "already_filled":

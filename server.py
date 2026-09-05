@@ -161,7 +161,9 @@ class AppHandler(BaseHTTPRequestHandler):
         for equivalence in result.equivalences:
             item = equivalence.to_dict()
             item["found_in_rtf"] = course_exists_in_detail(
-                rtf_content, equivalence.subject_code
+                rtf_content,
+                equivalence.subject_code,
+                equivalence.subject_name,
             )
             items.append(item)
 
