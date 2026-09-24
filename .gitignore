@@ -1,6 +1,10 @@
 __pycache__/
 *.py[cod]
 .venv/
+.venv-build/
+build/
+dist/
+*.spec
 output/*
 !output/playwright/
 output/playwright/*
