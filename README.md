@@ -70,20 +70,23 @@ EQUIVALENTE: RTR20188 LENGUA DE SEÑAS
 
 ## Ejecutar la aplicación de escritorio en Windows
 
-### Opción recomendada: usar el ejecutable
+### Opción recomendada: descargar la versión portable
 
 La aplicación es portable: no requiere instalación ni necesita que Python esté instalado.
 
-1. Abre la carpeta `dist`.
-2. Haz doble clic en `EquivalenciasPlanEstudios.exe`.
-3. Selecciona el PDF y el archivo RTF desde la ventana de la aplicación.
-4. Cierra la ventana cuando termines.
+<p align="center">
+  <a href="./downloads/EquivalenciasPlanEstudios-Windows.zip?download=1">
+    <img src="https://img.shields.io/badge/DESCARGAR_APP_PARA_WINDOWS-2563EB?style=for-the-badge&logo=windows11&logoColor=white" height="48" alt="Descargar aplicación de escritorio para Windows" />
+  </a>
+</p>
 
-```text
-dist\EquivalenciasPlanEstudios.exe
-```
+1. Descarga `EquivalenciasPlanEstudios-Windows.zip` desde el botón anterior.
+2. Haz clic derecho en el archivo descargado y selecciona **Extraer todo**.
+3. Abre la carpeta descomprimida.
+4. Haz doble clic en `EquivalenciasPlanEstudios.exe`.
+5. Selecciona el PDF y el archivo RTF desde la ventana de la aplicación.
 
-Puedes copiar ese único archivo `.exe` al escritorio, a otra carpeta, a un pendrive o a otro computador con Windows 10/11.
+Puedes mover el archivo `.exe` descomprimido al escritorio, a otra carpeta, a un pendrive o a otro computador con Windows 10/11.
 
 > [!NOTE]
 > Los documentos se procesan localmente. La aplicación abre un servicio privado en `127.0.0.1`, elige automáticamente un puerto libre y lo cierra junto con la ventana.
