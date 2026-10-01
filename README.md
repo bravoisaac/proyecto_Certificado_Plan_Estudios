@@ -122,7 +122,7 @@ dist\EquivalenciasPlanEstudios.exe
 
 ## Ejecutar desde el código fuente
 
-Si no quieres usar el ejecutable, puedes iniciar la versión local con `iniciar_app.bat`. En el primer inicio se crea el entorno virtual y se instalan las dependencias.
+Si no quieres usar el ejecutable, puedes iniciar la versión local con `iniciar_app.bat`. En el primer inicio se crea el entorno virtual y se instalan las dependencias. Si Python no está instalado pero el ejecutable portable existe en `dist`, el iniciador abrirá ese ejecutable automáticamente.
 
 También puedes iniciarla manualmente:
 
